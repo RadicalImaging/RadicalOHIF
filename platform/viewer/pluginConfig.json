@@ -25,6 +25,10 @@
       "version": "3.0.1"
     },
     {
+      "packageName": "@radicalimaging/hp-extension",
+      "version": "3.0.1"
+    },
+    {
       "packageName": "@ohif/extension-tmtv",
       "version": "3.0.0"
     },
@@ -41,6 +45,14 @@
     {
       "packageName": "@ohif/mode-tmtv",
       "version": "3.0.0"
+    },
+    {
+      "packageName": "@radicalimaging/findings-mode",
+      "version": "3.0.1"
+    },
+    {
+      "packageName": "@radicalimaging/volume-mode",
+      "version": "3.0.1"
     }
   ],
   "modesFactory": [],

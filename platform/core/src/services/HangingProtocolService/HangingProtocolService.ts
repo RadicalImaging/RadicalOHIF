@@ -458,7 +458,10 @@ class HangingProtocolService {
     // if the viewport is not empty, then we check the displaySets it is showing
     // currently, which means we need to check if the requested updated displaySet
     // follow the same rules as the current displaySets
-    const displaySetSelectorId = protocolViewport.displaySets[0].id;
+    const {
+      id: displaySetSelectorId,
+      displaySetIndex = 0,
+    } = protocolViewport.displaySets[0];
     const displaySetSelector =
       protocol.displaySetSelectors[displaySetSelectorId];
 
@@ -498,7 +501,10 @@ class HangingProtocolService {
     protocolViewports.forEach((viewport, index) => {
       let viewportNeedsUpdate;
       for (const displaySet of viewport.displaySets) {
-        if (displaySet.id === displaySetSelectorId) {
+        if (
+          displaySet.id === displaySetSelectorId &&
+          (displaySet.displaySetIndex || 0) === displaySetIndex
+        ) {
           viewportNeedsUpdate = true;
           break;
         }
@@ -1092,7 +1098,7 @@ class HangingProtocolService {
 
       const matched = this.protocolEngine.findMatch(displaySet, requiredRules);
 
-      if (!matched || matched.score === 0) {
+      if (!matched || (matched.score === 0 && requiredRules.length)) {
         throw new Error(
           `The displaySetInstanceUID ${displaySet.displaySetInstanceUID} does not satisfy the required seriesMatching criteria for the protocol`
         );

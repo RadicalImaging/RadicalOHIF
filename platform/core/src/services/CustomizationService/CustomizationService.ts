@@ -55,7 +55,7 @@ export default class CustomizationService extends PubSubService {
 
   modeCustomizations: Record<string, Customization> = {};
   globalCustomizations: Record<string, Customization> = {};
-  configuration: UICustomizationConfiguration;
+  configuration: CustomizationConfiguration;
 
   constructor({ configuration, commandsManager }) {
     super(EVENTS);
@@ -128,7 +128,6 @@ export default class CustomizationService extends PubSubService {
     customizationId: string,
     customization: Customization
   ): void {
-    console.log('** Set mode customization', customizationId, customization);
     this.modeCustomizations[customizationId] = merge(
       this.modeCustomizations[customizationId] || {},
       customization
@@ -194,7 +193,6 @@ export default class CustomizationService extends PubSubService {
   }
 
   setGlobalCustomization(id: string, value: Customization): void {
-    console.log('*** Set global', id, value);
     this.globalCustomizations[id] = value;
     this._broadcastGlobalCustomizationModified();
   }

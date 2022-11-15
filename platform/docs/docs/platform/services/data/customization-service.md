@@ -151,14 +151,14 @@ with a bottom-right overlay, which extends the customizationService configuratio
 
 ```js
 // Import the type from the extension itself
-import OverlayUICustomization from '@ohif/cornerstone-extension';
+import OverlayCustomization from '@ohif/cornerstone-extension';
 
 
 // In the mode itself, customizations can be registered:
 onModeEnter() {
   ...
   // Note how the object can be strongly typed
-  const bottomRight: OverlayUICustomization =     {
+  const bottomRight: OverlayCustomization =     {
       id: 'cornerstoneOverlayBottomRight',
       // Note the type is the previously registered ohif.cornerstoneOverlay
       customizationType: 'ohif.cornerstoneOverlay',

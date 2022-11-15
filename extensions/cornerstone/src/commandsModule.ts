@@ -6,20 +6,20 @@ import {
 import {
   ToolGroupManager,
   Enums,
-  utilities as cstUtils,
+  utilities as csToolsUtils,
   segmentation as cstSegmentation,
   ReferenceLinesTool,
   synchronizers as cstSynchronizers,
 } from '@cornerstonejs/tools';
+import { ContextMenu } from '@ohif/ui';
 
 import CornerstoneViewportDownloadForm from './utils/CornerstoneViewportDownloadForm';
-
+import { connectToolsToMeasurementService } from './initMeasurementService';
 import { getEnabledElement as OHIFgetEnabledElement } from './state';
 import callInputDialog from './utils/callInputDialog';
 import { setColormap } from './utils/colormap/transferFunctionHelpers';
-import getProtocolViewportStructureFromGridViewports from './utils/getProtocolViewportStructureFromGridViewports';
-import removeToolGroupSegmentationRepresentations from './utils/removeToolGroupSegmentationRepresentations';
 import calculateViewportRegistrations from './utils/calculateViewportRegistrations';
+import defaultContextMenu from './defaultContextMenu';
 
 const MPR_TOOLGROUP_ID = 'mpr';
 
@@ -29,7 +29,7 @@ const MPR_TOOLGROUP_ID = 'mpr';
 // ]}
 let STACK_IMAGE_SYNC_GROUPS_INFO = [];
 
-const commandsModule = ({ servicesManager }) => {
+const commandsModule = ({ servicesManager, commandsManager }) => {
   const {
     ViewportGridService,
     ToolGroupService,
@@ -37,15 +37,35 @@ const commandsModule = ({ servicesManager }) => {
     SyncGroupService,
     CineService,
     ToolBarService,
+    customizationService,
     UIDialogService,
+    MeasurementService,
     CornerstoneViewportService,
     HangingProtocolService,
     UINotificationService,
   } = servicesManager.services;
 
-  function _getActiveViewportEnabledElement() {
+  const contextMenuController = new ContextMenu.Controller(
+    servicesManager,
+    commandsManager
+  );
+
+  /* Measurement Service */
+  const measurementServiceSource = connectToolsToMeasurementService(
+    MeasurementService,
+    DisplaySetService,
+    CornerstoneViewportService
+  );
+
+  function _getActiveEnabledElement() {
     const { activeViewportIndex } = ViewportGridService.getState();
     const { element } = OHIFgetEnabledElement(activeViewportIndex) || {};
+
+    return element;
+  }
+
+  function _getActiveViewportEnabledElement() {
+    const element = _getActiveEnabledElement();
     const enabledElement = getEnabledElement(element);
     return enabledElement;
   }
@@ -84,7 +104,129 @@ const commandsModule = ({ servicesManager }) => {
     return toolGroup;
   }
 
+  function _showViewerContextMenu(viewerElement, options) {
+    let defaultPointsPosition = [];
+    if (options.nearbyToolData) {
+      defaultPointsPosition = commandsManager.runCommand(
+        'getToolDataActiveCanvasPoints',
+        { toolData: options.nearbyToolData }
+      );
+    }
+
+    contextMenuController.showContextMenu(
+      options,
+      viewerElement,
+      defaultPointsPosition
+    );
+  }
+
   const actions = {
+    /** Show the specified context menu */
+    showViewerContextMenu: providedOptions => {
+      const viewerElement = _getActiveEnabledElement();
+
+      const options = { ...providedOptions };
+      const { event: evt } = options;
+      const { useSelectedAnnotation, nearbyToolData, menuName } = options;
+
+      if (menuName) {
+        Object.assign(
+          options,
+          customizationService.getModeCustomization(
+            menuName,
+            defaultContextMenu
+          )
+        );
+      }
+
+      if (useSelectedAnnotation && !nearbyToolData) {
+        const firstAnnotationSelected = getFirstAnnotationSelected(
+          viewerElement
+        );
+        // filter by allowed selected tools from config property (if there is any)
+        if (
+          !options.allowedSelectedTools ||
+          options.allowedSelectedTools.includes(
+            firstAnnotationSelected?.metadata?.toolName
+          )
+        ) {
+          options.nearbyToolData = firstAnnotationSelected;
+        } else {
+          return;
+        }
+      }
+
+      // TODO - make the checkProps richer by including the study metadata and display set.
+      options.checkProps = {
+        toolName: options.nearbyToolData?.metadata?.toolName,
+        value: options.nearbyToolData,
+        uid: options.nearbyToolData?.annotationUID,
+        nearbyToolData: options.nearbyToolData,
+      };
+
+      _showViewerContextMenu(viewerElement, options);
+    },
+
+    /** Close any viewer context menus currently displayed */
+    closeViewerContextMenu: () => {
+      contextMenuController.closeViewerContextMenu();
+    },
+
+    getNearbyToolData({ nearbyToolData, element, canvasCoordinates }) {
+      return (
+        nearbyToolData ??
+        csToolsUtils.getAnnotationNearPoint(element, canvasCoordinates)
+      );
+    },
+
+    // Measurement tool commands:
+    deleteMeasurement: ({ uid }) => {
+      if (uid) {
+        measurementServiceSource.remove(uid);
+      }
+    },
+    setLabel: ({ uid }) => {
+      const measurement = MeasurementService.getMeasurement(uid);
+
+      callInputDialog(
+        UIDialogService,
+        measurement,
+        (label, actionId) => {
+          if (actionId === 'cancel') {
+            return;
+          }
+
+          const updatedMeasurement = Object.assign({}, measurement, {
+            label,
+          });
+
+          MeasurementService.update(
+            updatedMeasurement.uid,
+            updatedMeasurement,
+            true
+          );
+        },
+        false
+      );
+    },
+
+    updateMeasurement: props => {
+      const { code, uid, measurementKey = 'finding' } = props;
+      const measurement = MeasurementService.getMeasurement(uid);
+      const updatedMeasurement = {
+        ...measurement,
+        [measurementKey]: code,
+        label: code.text,
+      };
+      MeasurementService.update(
+        updatedMeasurement.uid,
+        updatedMeasurement,
+        true
+      );
+    },
+
+    // Retrieve value commands
+    getActiveEnabledElement: _getActiveEnabledElement,
     getActiveViewportEnabledElement: () => {
       return _getActiveViewportEnabledElement();
     },
@@ -334,7 +476,7 @@ const commandsModule = ({ servicesManager }) => {
       const { viewport } = enabledElement;
       const options = { delta: direction };
 
-      cstUtils.scroll(viewport, options);
+      csToolsUtils.scroll(viewport, options);
     },
     setViewportColormap: ({
       viewportIndex,
@@ -625,6 +767,43 @@ const commandsModule = ({ servicesManager }) => {
   };
 
   const definitions = {
+    showViewerContextMenu: {
+      commandFn: actions.showViewerContextMenu,
+      storeContexts: [],
+      options: {},
+    },
+    closeViewerContextMenu: {
+      commandFn: actions.closeViewerContextMenu,
+      storeContexts: [],
+      options: {},
+    },
+    getNearbyToolData: {
+      commandFn: actions.getNearbyToolData,
+      storeContexts: [],
+      options: {},
+    },
+
+    deleteMeasurement: {
+      commandFn: actions.deleteMeasurement,
+      storeContexts: [],
+      options: {},
+    },
+    setLabel: {
+      commandFn: actions.setLabel,
+      storeContexts: [],
+      options: {},
+    },
+    setFinding: {
+      commandFn: actions.updateMeasurement,
+      storeContexts: [],
+      options: { measurementKey: 'finding' },
+    },
+    setSite: {
+      commandFn: actions.updateMeasurement,
+      storeContexts: [],
+      options: { measurementKey: 'site' },
+    },
+
     setWindowLevel: {
       commandFn: actions.setWindowLevel,
       storeContexts: [],

@@ -46,6 +46,7 @@ function WorkList({
   isLoadingData,
   dataSource,
   hotkeysManager,
+  routerPath,
 }) {
   const { hotkeyDefinitions, hotkeyDefaults } = hotkeysManager;
   const { show, hide } = useModal();
@@ -184,7 +185,7 @@ function WorkList({
     });
 
     navigate({
-      pathname: '/',
+      pathname: routerPath,
       search: search ? `?${search}` : undefined,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -346,7 +347,8 @@ function WorkList({
             return (
               <Link
                 key={i}
-                to={`${mode.routeName}?StudyInstanceUIDs=${studyInstanceUid}`}
+                to={`${routerPath ? '../' : ''}${mode.routeName}${routerPath ||
+                  ''}?StudyInstanceUIDs=${studyInstanceUid}`}
                 // to={`${mode.routeName}/dicomweb?StudyInstanceUIDs=${studyInstanceUid}`}
               >
                 <Button
